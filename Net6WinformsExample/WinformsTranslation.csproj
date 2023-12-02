@@ -14,9 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="input.wav">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    <ProjectReference Include="..\Art3xias.SoxWrapper\Art3xias.SoxWrapper.csproj" />
   </ItemGroup>
 
 </Project>

@@ -24,9 +24,9 @@ namespace Art3xias.SoxWrapper
                 return this;
             }
 
-            public SoxWrapperOptionsBuilder WithExtractCommand(int secondsToExtract)
+            public SoxWrapperOptionsBuilder WithExtractCommand(int secondsToExtract, string inputFileName, string outputFileName)
             {
-                _options.Command = @$"input.wav output.wav trim -{secondsToExtract}";
+                _options.Command = " input.wav output.wav trim -3";
                 return this;
             }
 
@@ -40,7 +40,6 @@ namespace Art3xias.SoxWrapper
             {
                 return _options;
             }
-
         }
 
         public class SoxWrapperOptions
@@ -60,12 +59,19 @@ namespace Art3xias.SoxWrapper
                             FileName = ExeLocation,
                             Arguments = Command,
                             UseShellExecute = false,
+                            CreateNoWindow = true,
                             RedirectStandardInput = true,
                             RedirectStandardOutput = true,
                             RedirectStandardError = true,
+                            WorkingDirectory = ""
                         };
 
                             process.Start();
+
+                            string errorOutput = process.StandardError.ReadToEnd();
+                            System.Diagnostics.Debug.WriteLine($"Error output from sox:\n{errorOutput}");
+
+                            process.WaitForExit();
                     }
                 }
                 catch (Exception ex)

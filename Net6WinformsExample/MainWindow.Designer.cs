@@ -83,7 +83,6 @@
             // btnStop
             // 
             this.btnStop.Dock = System.Windows.Forms.DockStyle.Top;
-            this.btnStop.Enabled = false;
             this.btnStop.Location = new System.Drawing.Point(0, 0);
             this.btnStop.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             this.btnStop.Name = "btnStop";
@@ -96,7 +95,6 @@
             // btnStart
             // 
             this.btnStart.Dock = System.Windows.Forms.DockStyle.Top;
-            this.btnStart.Enabled = false;
             this.btnStart.Location = new System.Drawing.Point(0, 27);
             this.btnStart.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             this.btnStart.Name = "btnStart";

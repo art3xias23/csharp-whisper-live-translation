@@ -8,24 +8,32 @@ namespace WinformsTranslation
 {
     internal class WavDetails
     {
-        public static void PrintWavDetials(byte[] wavBytes)
+        public static void PrintWavDetials(byte[] wavBytes, string inputFile)
         {
+            if (wavBytes == null || wavBytes.Length == 0)
+            {
+                wavBytes = File.ReadAllBytes(inputFile);
+            }
+
+
             WavHeader wavHeader = new WavHeader();
             wavHeader.Parse(wavBytes);
 
-           System.Diagnostics.Debug.WriteLine($"Chunk ID: {wavHeader.ChunkID}");
-           System.Diagnostics.Debug.WriteLine($"Chunk Size: {wavHeader.ChunkSize} bytes");
-           System.Diagnostics.Debug.WriteLine($"Format: {wavHeader.Format}");
-           System.Diagnostics.Debug.WriteLine($"Subchunk1 ID: {wavHeader.Subchunk1ID}");
-           System.Diagnostics.Debug.WriteLine($"Subchunk1 Size: {wavHeader.Subchunk1Size} bytes");
-           System.Diagnostics.Debug.WriteLine($"Audio Format: {wavHeader.AudioFormat}");
-           System.Diagnostics.Debug.WriteLine($"Number of Channels: {wavHeader.NumChannels}");
-           System.Diagnostics.Debug.WriteLine($"Sample Rate: {wavHeader.SampleRate} Hz");
-           System.Diagnostics.Debug.WriteLine($"Byte Rate: {wavHeader.ByteRate} bytes per second");
-           System.Diagnostics.Debug.WriteLine($"Block Align: {wavHeader.BlockAlign} bytes");
-           System.Diagnostics.Debug.WriteLine($"Bits Per Sample: {wavHeader.BitsPerSample} bits");
-           System.Diagnostics.Debug.WriteLine($"Subchunk2Id: {wavHeader.SubChunk2Id} bytes");
-           System.Diagnostics.Debug.WriteLine($"Subchunk2Size: {wavHeader.SubChunk2Size} bytes");
+            System.Diagnostics.Debug.WriteLine($"Chunk ID: {wavHeader.ChunkID}");
+            System.Diagnostics.Debug.WriteLine($"Chunk Size: {wavHeader.ChunkSize} bytes");
+            System.Diagnostics.Debug.WriteLine($"Format: {wavHeader.Format}");
+            System.Diagnostics.Debug.WriteLine($"Subchunk1 ID: {wavHeader.Subchunk1ID}");
+            System.Diagnostics.Debug.WriteLine($"Subchunk1 Size: {wavHeader.Subchunk1Size} bytes");
+            System.Diagnostics.Debug.WriteLine($"Audio Format: {wavHeader.AudioFormat}");
+            System.Diagnostics.Debug.WriteLine($"Number of Channels: {wavHeader.NumChannels}");
+            System.Diagnostics.Debug.WriteLine($"Sample Rate: {wavHeader.SampleRate} Hz");
+            System.Diagnostics.Debug.WriteLine($"Byte Rate: {wavHeader.ByteRate} bytes per second");
+            System.Diagnostics.Debug.WriteLine($"Block Align: {wavHeader.BlockAlign} bytes");
+            System.Diagnostics.Debug.WriteLine($"Bits Per Sample: {wavHeader.BitsPerSample} bits");
+            System.Diagnostics.Debug.WriteLine($"Subchunk2Id: {wavHeader.SubChunk2Id} bytes");
+            System.Diagnostics.Debug.WriteLine($"Subchunk2Size: {wavHeader.SubChunk2Size} bytes");
+            System.Diagnostics.Debug.WriteLine("====================");
+            System.Diagnostics.Debug.WriteLine("====================");
         }
 
         class WavHeader

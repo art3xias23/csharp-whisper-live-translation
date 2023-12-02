@@ -4,10 +4,11 @@ using Timer = System.Timers.Timer;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Timers;
+using System.Windows.Forms;
+using Art3xias.SoxWrapper;
 using CSCore;
 using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
-using System.Windows.Forms;
 using CSCore.SoundIn;
 using CSCore.Streams;
 using CSCore.Win32;
@@ -18,16 +19,9 @@ namespace Recorder
 {
     public partial class MainWindow : Form
     {
-        private byte[] Result1 = Array.Empty<byte>();
-        private MemoryStream Result1Mem = new MemoryStream();
-        private byte[] Result2 = Array.Empty<byte>();
-        private byte[] OverlapBuffer = Array.Empty<byte>();
-        private MemoryStream OverlapBufferMem = new MemoryStream();
-
         private int IntervalTimeInSeconds = 5;
         private int OverlapTimeInSeconds = 2;
 
-        private int counter = 0;
         //Change this to CaptureMode.Capture to capture a microphone,...
         private const CaptureMode CaptureMode = Recorder.CaptureMode.Capture;
 
@@ -38,6 +32,10 @@ namespace Recorder
         private readonly GraphVisualization _graphVisualization = new GraphVisualization();
         private IWaveSource _finalSource;
 
+        private string _inputFileName = "input.wav";
+        private string _outputFileName = "output.wav";
+
+
         private Timer _timer;
 
         public MMDevice SelectedDevice
@@ -46,8 +44,8 @@ namespace Recorder
             set
             {
                 _selectedDevice = value;
-                if (value != null)
-                    btnStart.Enabled = true;
+                //if (value != null)
+                    //btnStart.Enabled = true;
             }
         }
 
@@ -94,14 +92,14 @@ namespace Recorder
 
             _soundIn.Device = SelectedDevice;
             _soundIn.Initialize();
+            _memStream = new MemoryStream();
 
             var soundInSource = new SoundInSource(_soundIn);
             var singleBlockNotificationStream = new SingleBlockNotificationStream(soundInSource.ToSampleSource());
             _finalSource = singleBlockNotificationStream.ToWaveSource();
-            _memStream = new MemoryStream();
             _writer = new WaveWriter(_memStream, _finalSource.WaveFormat);
 
-            var buffer = new byte[_finalSource.WaveFormat.BytesPerSecond / 16];
+            byte[] buffer = new byte[_finalSource.WaveFormat.BytesPerSecond / 2];
             soundInSource.DataAvailable += (s, e) =>
             {
                 int read;
@@ -113,114 +111,45 @@ namespace Recorder
 
             _soundIn.Start();
 
-            _timer = new Timer(); 
+            _timer = new Timer();
             _timer.Interval = IntervalTimeInSeconds * 1000; // Convert to milliseconds
             _timer.Elapsed += ProcessAudio;
             _timer.Start();
 
         }
-        private void ProcessSimpleAudio(object? sender, ElapsedEventArgs e)
+        private async void ProcessAudio(object? sender, ElapsedEventArgs e)
         {
-
-            _timer.Stop();
-            _soundIn.Stop();
-            var mem = _memStream.ToArray();
- 
-            Task.Run(async () => await ProcessData(mem));
-
-            _memStream = new MemoryStream(); 
-            _soundIn.Start();
-
-            _timer.Start();
-        }
-        private void ProcessAudio(object? sender, ElapsedEventArgs e)
-        {
-
-            _timer.Stop();
- 
-            var memArray = _memStream.ToArray();
-            var fileName = $"File{counter}.wav";
-            File.WriteAllBytes(fileName, memArray);
-            System.Diagnostics.Debug.WriteLine($"FileName: {fileName}");
-            WavDetails.PrintWavDetials(memArray);
-
-            counter++;
-            var duplicateStream = new MemoryStream(memArray);
-            Task.Run(async () => await ProcessData(_memStream.ToArray()));
-
-            int secondsToRemove = 3;
-            byte[] trimmedAudioBytes = RemoveDurationFromAudio(memArray, secondsToRemove, _finalSource.WaveFormat.SampleRate, _finalSource.WaveFormat.BytesPerSecond);
-            _memStream = new MemoryStream(trimmedAudioBytes);
-
-            _timer.Start();
+            await ProcessData();
         }
 
-        static byte[] RemoveDurationFromAudio(byte[] audioBytes, int durationInSecondsToRemove, int sampleRate, int bytesPerSecond)
+        private async Task ProcessData()
         {
-            // Calculate the number of bytes to remove
-            //int bytesPerSecond = 44100 * 2; // Assuming 44.1 kHz sample rate and 16-bit audio
-            int bytesToRemove = durationInSecondsToRemove * bytesPerSecond;
-
-            // Check if the specified duration exceeds the length of the audio
-            if (bytesToRemove >= audioBytes.Length)
-            {
-                // Handle the case where the specified duration is longer than the audio
-                throw new ArgumentException("Duration to remove exceeds the length of the audio.");
-            }
-
-            // Create a new byte array for the trimmed audio
-            byte[] trimmedAudioBytes = new byte[audioBytes.Length - bytesToRemove];
-
-            // Copy the audio data after the specified duration
-            Array.Copy(audioBytes, bytesToRemove, trimmedAudioBytes, 0, trimmedAudioBytes.Length);
-
-            return trimmedAudioBytes;
-        }
-
-        private void ProcessAudioBackUp(object? sender, ElapsedEventArgs e)
-        {
-            _timer.Stop();
-            var memArray = _memStream.ToArray();
-            Result1 = CombineAudio(memArray, OverlapBuffer);
-            OverlapBuffer = ExtractOverlap(memArray, _finalSource.WaveFormat.SampleRate,
-                _finalSource.WaveFormat.BytesPerSample, OverlapTimeInSeconds);
-            var duplicateStream = new MemoryStream(memArray);
-
-            Task.Run(async () => await ProcessData(duplicateStream.ToArray()));
-            _memStream.SetLength(0); 
-            _timer.Start();
-        }
-
-        private byte[] ExtractOverlap(byte[] audioBytes, int sampleRate, int bytesPerSample, int durationInSeconds)
-        {
-            var startingPoint = 0;
-            var byteCount = durationInSeconds * sampleRate * bytesPerSample;
-            if (byteCount > audioBytes.Length)
-            {
-                throw new ArgumentException("Invalid extraction parameters: The specified duration exceeds the length of the audio array");
-            }
-
-            byte[] extractedAudio = new byte[byteCount];
-            Array.Copy(audioBytes, startingPoint, extractedAudio, 0, byteCount);
-
-            return extractedAudio;
-
-        }
-
-        private byte[] CombineAudio(byte[] audio1Bytes, byte[] audio2Bytes)
-        {
-            byte[] concatenatedArray = new byte[audio1Bytes.Length + audio2Bytes.Length];
-            Buffer.BlockCopy(audio1Bytes, 0, concatenatedArray, 0, audio1Bytes.Length);
-            Buffer.BlockCopy(audio2Bytes, 0, concatenatedArray, audio1Bytes.Length, audio2Bytes.Length);
-            return concatenatedArray;
-        }
-
-        private async Task ProcessData(byte[] data)
-        {
-            var dataResponse = await SpeechToText.SpToText(data);
+            StopCapture();
+            var copyOfMemStream = new MemoryStream(_memStream.ToArray());
+            File.WriteAllBytes(_inputFileName, copyOfMemStream.ToArray());
+            WavDetails.PrintWavDetials(null, _inputFileName);
+            ExtractAudio();
+            var outputData = ReadExtractedAudio();
+            var dataResponse = await SpeechToText.SpToTextAsync(outputData);
             textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, dataResponse)));
+            StartCapture();
         }
 
+        private byte[] ReadExtractedAudio()
+        {
+            return File.ReadAllBytes(_outputFileName);
+        }
+
+        private void ExtractAudio()
+        {
+            new SoxWrapperClient()
+                .WithOptions()
+                .WithExeLocation(@"C:\Program Files (x86)\sox-14-4-2\sox.exe")
+                //.WithExeLocation(@"cmd.exe")
+                .WithExtractCommand(3, _inputFileName, _outputFileName)
+                .Build()
+                .Execute();
+        }
 
         private void SingleBlockNotificationStreamOnSingleBlockRead(object sender, SingleBlockReadEventArgs e)
         {
@@ -236,10 +165,15 @@ namespace Recorder
 
         private void btnStart_Click(object sender, EventArgs e)
         {
-            
-                StartCapture();
-                btnStart.Enabled = false;
-                btnStop.Enabled = true;
+            CreateInputFileName();
+            StartCapture();
+            btnStart.Enabled = false;
+            btnStop.Enabled = true;
+        }
+
+        private void CreateInputFileName()
+        {
+            //File.Create(_inputFileName).Close();
         }
 
         private void btnStop_Click(object sender, EventArgs e)
@@ -259,13 +193,9 @@ namespace Recorder
                 if (_writer is IDisposable)
                     ((IDisposable)_writer).Dispose();
 
-                btnStop.Enabled = false;
-                btnStart.Enabled = true;
+                //btnStop.Enabled = false;
+                //btnStart.Enabled = true;
             }
-            await Task.Delay(3000);
-            var fileBytesLocation = @"C:\Users\kmilchev\Documents\1.wav";
-            var fileBytes = await File.ReadAllBytesAsync(fileBytesLocation);
-            await SpeechToText.SpToText(fileBytes);
         }
 
         private void deviceList_SelectedIndexChanged(object sender, EventArgs e)

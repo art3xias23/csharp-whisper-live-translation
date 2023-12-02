@@ -6,10 +6,10 @@ namespace WhisperLiveTranslation
 {
     public class SpeechToText
     {
-        public static async Task<string> SpToText(byte[] audioBytes)
+        public static async Task<string> SpToTextAsync(byte[] audioBytes)
         {
             string whisperUrl = "https://api.openai.com/v1/audio/transcriptions";
-            string apiKey = Environment.GetEnvironmentVariable("WhisperApiKey");;
+            string apiKey = Environment.GetEnvironmentVariable("WhisperApiKey");
             HttpClient http = new HttpClient();
             http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
             // add the audio bytes to the form data
