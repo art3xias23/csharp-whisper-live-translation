@@ -12,7 +12,6 @@ using CSCore.CoreAudioAPI;
 using CSCore.SoundIn;
 using CSCore.Streams;
 using CSCore.Win32;
-using WhisperLiveTranslation;
 using WinformsTranslation;
 
 namespace Recorder
@@ -45,7 +44,7 @@ namespace Recorder
             {
                 _selectedDevice = value;
                 //if (value != null)
-                    //btnStart.Enabled = true;
+                //btnStart.Enabled = true;
             }
         }
 
@@ -90,7 +89,8 @@ namespace Recorder
             else
                 _soundIn = new WasapiLoopbackCapture();
 
-            _soundIn.Device = SelectedDevice;
+            if (_soundIn.Device == null)
+                _soundIn.Device = SelectedDevice;
             _soundIn.Initialize();
             _memStream = new MemoryStream();
 
@@ -126,13 +126,13 @@ namespace Recorder
         {
             StopCapture();
             var copyOfMemStream = new MemoryStream(_memStream.ToArray());
+            StartCapture();
             File.WriteAllBytes(_inputFileName, copyOfMemStream.ToArray());
             WavDetails.PrintWavDetials(null, _inputFileName);
             ExtractAudio();
             var outputData = ReadExtractedAudio();
-            var dataResponse = await SpeechToText.SpToTextAsync(outputData);
+            var dataResponse = await SpeechToTextApi.SpToTextAsync(outputData);
             textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, dataResponse)));
-            StartCapture();
         }
 
         private byte[] ReadExtractedAudio()

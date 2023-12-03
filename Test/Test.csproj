@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Art3xias.SoxWrapper\Art3xias.SoxWrapper.csproj" />
+    <ProjectReference Include="..\Logic\Logic.csproj" />
   </ItemGroup>
 
   <ItemGroup>
