@@ -32,7 +32,8 @@ namespace Logic
             using var processor = whisperFactory.CreateBuilder()
                 .WithLanguage("auto")
                 .Build();
-
+            await File.WriteAllBytesAsync("input.wav",data);
+            WavDetails.PrintWavDetials(null,"input.wav");
             var memStream = new MemoryStream(data);
             var text = string.Empty;
             // This section processes the audio file and prints the results (start time, end time and text) to the console.
