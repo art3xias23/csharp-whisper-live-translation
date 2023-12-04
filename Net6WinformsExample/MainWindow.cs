@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Diagnostics.Metrics;
 using Timer = System.Timers.Timer;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -30,9 +31,11 @@ namespace Recorder
         private MemoryStream _memStream;
         private readonly GraphVisualization _graphVisualization = new GraphVisualization();
         private IWaveSource _finalSource;
+        private bool _manualStop = false;
 
         private string _inputFileName = "input.wav";
         private string _outputFileName = "output.wav";
+        private int conter = 0;
 
 
         private Timer _timer;
@@ -81,16 +84,8 @@ namespace Recorder
 
         private void StartCapture()
         {
-            if (SelectedDevice == null)
-                return;
-
-            if (CaptureMode == CaptureMode.Capture)
-                _soundIn = new WasapiCapture();
-            else
-                _soundIn = new WasapiLoopbackCapture();
-
-            if (_soundIn.Device == null)
-                _soundIn.Device = SelectedDevice;
+            if (HandleSoundIn()) return;
+            _soundIn = new WasapiCapture();
             _soundIn.Initialize();
             _memStream = new MemoryStream();
 
@@ -104,7 +99,15 @@ namespace Recorder
             {
                 int read;
                 while ((read = _finalSource.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    if (_manualStop)
+                    {
+                        _memStream = new MemoryStream();
+                        _writer = new WaveWriter(_memStream, _finalSource.WaveFormat);
+                        _manualStop = false;
+                    }
                     _writer.Write(buffer, 0, read);
+                }
             };
 
             singleBlockNotificationStream.SingleBlockRead += SingleBlockNotificationStreamOnSingleBlockRead;
@@ -117,22 +120,84 @@ namespace Recorder
             _timer.Start();
 
         }
+        private async Task StartNotificationCapture()
+        {
+            if (HandleSoundIn()) return;
+            //1. init capture
+            _soundIn = new WasapiCapture();
+            _soundIn.Device = SelectedDevice;
+            _soundIn.Initialize();
+
+//2. wrap capture to an audio stream
+            var soundInSource = new SoundInSource(_soundIn);
+
+//3. wrap audio stream within an NotificationSource in order to intercept samples
+            var notificationSource = new NotificationSource(soundInSource.ToSampleSource());
+            notificationSource.Interval = 5000; //5 seconds
+            notificationSource.BlockRead += async(s, e) =>
+            {
+                var fileName = "input.wav";
+
+                using(var writer = new WaveWriter(fileName, notificationSource.WaveFormat))
+                    writer.WriteSamples(e.Data, 0, e.Length);
+
+
+                var result = await SpeechToTextPackage.TranslateAsync(fileName);
+                textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, result)));
+            };
+
+//4. convert whole chain back to WaveSource to write wave to the file
+            var waveSource = notificationSource.ToWaveSource();
+
+//5. initialize the wave writer
+            var writer = new WaveWriter("out.wav", waveSource.WaveFormat);
+
+//buffer for reading from the wavesource
+            byte[] buffer = new byte[waveSource.WaveFormat.BytesPerSecond / 2];
+
+//6. if capture serves new data to the audio stream chain, read from the last chain element (wavesource) and write it back to the file
+          //  this will process audio data from capture to notificationSource to wavesource and will also trigger the blockread event of the notificationSource
+            soundInSource.DataAvailable += (s, e) =>
+            {
+                int read;
+                while((read = waveSource.Read(buffer, 0, buffer.Length)) > 0)
+                    writer.Write(buffer, 0, read);
+            };
+
+            var singleBlockNotificationStream = new SingleBlockNotificationStream(soundInSource.ToSampleSource());
+
+            singleBlockNotificationStream.SingleBlockRead += SingleBlockNotificationStreamOnSingleBlockRead;
+
+            _soundIn.Start();
+
+        }
+
+        private bool HandleSoundIn()
+        {
+            if (SelectedDevice == null)
+                return true;
+            return false;
+        }
+
         private async void ProcessAudio(object? sender, ElapsedEventArgs e)
         {
+            //Every 5 seconds
+            _manualStop = true;
             await ProcessData();
+            _timer.Stop();
+            _timer.Start();
         }
 
         private async Task ProcessData()
         {
-            StopCapture();
             var copyOfMemStream = new MemoryStream(_memStream.ToArray());
-            StartCapture();
+            _inputFileName = conter + _inputFileName;
             File.WriteAllBytes(_inputFileName, copyOfMemStream.ToArray());
             WavDetails.PrintWavDetials(null, _inputFileName);
-            ExtractAudio();
-            var outputData = ReadExtractedAudio();
-            var dataResponse = await SpeechToTextApi.SpToTextAsync(outputData);
-            textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, dataResponse)));
+            //ExtractAudio();
+            //var outputData = ReadExtractedAudio();
+            //var dataResponse = await SpeechToTextApi.SpToTextAsync(outputData);
+            //textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, dataResponse)));
         }
 
         private byte[] ReadExtractedAudio()
@@ -163,12 +228,13 @@ namespace Recorder
             return (WaveFormat)Marshal.PtrToStructure(blob.Data, typeof(WaveFormat));
         }
 
-        private void btnStart_Click(object sender, EventArgs e)
+        private async void btnStart_Click(object sender, EventArgs e)
         {
             CreateInputFileName();
-            StartCapture();
-            btnStart.Enabled = false;
-            btnStop.Enabled = true;
+            //StartCapture();
+            await StartNotificationCapture();
+            //btnStart.Enabled = false;
+            //btnStop.Enabled = true;
         }
 
         private void CreateInputFileName()
