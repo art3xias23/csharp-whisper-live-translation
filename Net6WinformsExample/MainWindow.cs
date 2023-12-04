@@ -86,6 +86,7 @@ namespace Recorder
         {
             if (HandleSoundIn()) return;
             _soundIn = new WasapiCapture();
+            _soundIn.Device = SelectedDevice;
             _soundIn.Initialize();
             _memStream = new MemoryStream();
 
@@ -123,15 +124,12 @@ namespace Recorder
         private async Task StartNotificationCapture()
         {
             if (HandleSoundIn()) return;
-            //1. init capture
             _soundIn = new WasapiCapture();
             _soundIn.Device = SelectedDevice;
             _soundIn.Initialize();
 
-//2. wrap capture to an audio stream
             var soundInSource = new SoundInSource(_soundIn);
 
-//3. wrap audio stream within an NotificationSource in order to intercept samples
             var notificationSource = new NotificationSource(soundInSource.ToSampleSource());
             notificationSource.Interval = 5000; //5 seconds
             notificationSource.BlockRead += async(s, e) =>
@@ -146,17 +144,12 @@ namespace Recorder
                 textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, result)));
             };
 
-//4. convert whole chain back to WaveSource to write wave to the file
             var waveSource = notificationSource.ToWaveSource();
 
-//5. initialize the wave writer
             var writer = new WaveWriter("out.wav", waveSource.WaveFormat);
 
-//buffer for reading from the wavesource
             byte[] buffer = new byte[waveSource.WaveFormat.BytesPerSecond / 2];
 
-//6. if capture serves new data to the audio stream chain, read from the last chain element (wavesource) and write it back to the file
-          //  this will process audio data from capture to notificationSource to wavesource and will also trigger the blockread event of the notificationSource
             soundInSource.DataAvailable += (s, e) =>
             {
                 int read;
@@ -233,8 +226,8 @@ namespace Recorder
             CreateInputFileName();
             //StartCapture();
             await StartNotificationCapture();
-            //btnStart.Enabled = false;
-            //btnStop.Enabled = true;
+            btnStart.Enabled = false;
+            btnStop.Enabled = true;
         }
 
         private void CreateInputFileName()
@@ -245,6 +238,8 @@ namespace Recorder
         private void btnStop_Click(object sender, EventArgs e)
         {
             StopCapture();
+            btnStart.Enabled = true;
+            btnStop.Enabled = false;
         }
 
         private async void StopCapture()
@@ -254,7 +249,7 @@ namespace Recorder
                 _soundIn.Stop();
                 _soundIn.Dispose();
                 _soundIn = null;
-                _finalSource.Dispose();
+                _finalSource?.Dispose();
 
                 if (_writer is IDisposable)
                     ((IDisposable)_writer).Dispose();

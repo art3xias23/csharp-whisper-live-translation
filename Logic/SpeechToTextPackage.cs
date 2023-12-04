@@ -8,7 +8,7 @@ namespace Logic
 {
     public class SpeechToTextPackage
     {
-        public async Task TranslateAsync(string wavFileName)
+        public async Task<string> TranslateAsync(byte[] data)
         {
             var ggmlType = GgmlType.Base;
             var modelFileName = "ggml-model-whisper-base.en.bin";
@@ -33,15 +33,16 @@ namespace Logic
                 .WithLanguage("auto")
                 .Build();
 
-            using var fileStream = File.OpenRead(wavFileName);
-
-            WavDetails.PrintWavDetials(null, wavFileName);
-
+            var memStream = new MemoryStream(data);
+            var text = string.Empty;
             // This section processes the audio file and prints the results (start time, end time and text) to the console.
-            await foreach (var result in processor.ProcessAsync(fileStream))
+            await foreach (var result in processor.ProcessAsync(memStream))
             {
+                text += result.Text + " ";
                 System.Diagnostics.Debug.WriteLine($"{result.Start}->{result.End}: {result.Text}");
             }
+
+            return text;
         }
 
         private static async Task DownloadModel(string fileName, GgmlType ggmlType)
