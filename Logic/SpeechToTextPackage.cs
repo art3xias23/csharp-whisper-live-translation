@@ -1,62 +1,71 @@
-﻿using System.ComponentModel.DataAnnotations;
-using Art3xias.SoxWrapper;
+﻿using Art3xias.SoxWrapper;
 using Whisper.net;
 using Whisper.net.Ggml;
 using Whisper.net.Logger;
-using Whisper.net.Wave;
 
 namespace Logic
 {
     public class SpeechToTextPackage
     {
-        public static async Task<string> TranslateAsync(byte[] data)
+        public SpeechToTextPackage()
         {
+            //if (!File.Exists(modelFileName))
+            //{
+            //     DownloadModel(modelFileName, ggmlType);
+            //}
+        }
+        private static WhisperProcessor _processor;
+        private string input  = "input";
+        private string output  = "output";
+        private string ext = ".wav";
+        private int counter = 0;
+        public async Task<string> TranslateAsync(byte[] data)
+        {
+
+            System.Diagnostics.Debug.WriteLine(nameof(TranslateAsync));
+            string inCurrentFileName = input + counter + ext;
+            string outCurrentFileName = output + counter + ext;
+
+            System.Diagnostics.Debug.WriteLine(nameof(inCurrentFileName)+": "+ inCurrentFileName);
+            System.Diagnostics.Debug.WriteLine(nameof(outCurrentFileName)+": "+ outCurrentFileName);
+
             var ggmlType = GgmlType.Base;
+
             var modelFileName = "ggml-model-whisper-base.en.bin";
+            await File.WriteAllBytesAsync(inCurrentFileName, data);
 
-            await File.WriteAllBytesAsync("input.wav",data);
-
-            WavDetails.PrintWavDetials(null,"input.wav");
+            counter++ ;
+            //WavDetails.PrintWavDetials(null, inCurrentFileName);
 
             new SoxWrapperClient()
                 .WithOptions()
                 .WithExeLocation(
-                    @"C:\Users\kmilchev\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\sox-14.4.2\sox.exe")
-                .WithConvertCommand()
+                    @"C:\Program Files (x86)\sox-14-4-2\sox.exe")
+                .WithConvertCommand(inCurrentFileName, outCurrentFileName)
                 .Build()
                 .Execute();
 
-            WavDetails.PrintWavDetials(null,"output.wav");
-            var convertedStream = await File.ReadAllBytesAsync("output.wav");
-
-            // This section detects whether the "ggml-base.bin" file exists in our project disk. If it doesn't, it downloads it from the internet
-            if (!File.Exists(modelFileName))
-            {
-                await DownloadModel(modelFileName, ggmlType);
-            }
+            //WavDetails.PrintWavDetials(null, outCurrentFileName);
+            await using var fileStream = File.OpenRead(outCurrentFileName);
 
             // Optional logging from the native library
-            LogProvider.Instance.OnLog += (level, message) =>
-            {
-                System.Diagnostics.Debug.WriteLine($"{level}: {message}");
-            };
+            //LogProvider.Instance.OnLog += (level, message) =>
+            //{
+            //    System.Diagnostics.Debug.WriteLine($"{level}: {message}");
+            //};
 
-            // This section creates the whisperFactory object which is used to create the processor object.
-            using var whisperFactory = WhisperFactory.FromPath(modelFileName);
-
-            // This section creates the processor object which is used to process the audio file, it uses language `auto` to detect the language of the audio file.
-            using var processor = whisperFactory.CreateBuilder()
-                .WithLanguage("en")
-                .Build();
-            var memStream = new MemoryStream(convertedStream);
             var text = string.Empty;
-            // This section processes the audio file and prints the results (start time, end time and text) to the console.
-            await foreach (var result in processor.ProcessAsync(memStream))
+
+            await using var processor =  WhisperFactory.FromPath(modelFileName)
+                .CreateBuilder()
+              .WithLanguage("en")
+              .Build();
+            await foreach (var result in processor.ProcessAsync(fileStream))
             {
                 text += result.Text + " ";
                 System.Diagnostics.Debug.WriteLine($"{result.Start}->{result.End}: {result.Text}");
             }
-
+System.Diagnostics.Debug.WriteLine("Returning text");
             return text;
         }
 

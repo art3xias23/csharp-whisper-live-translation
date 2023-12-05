@@ -7,13 +7,13 @@ using NAudio.Wave;
 async Task NaudioTest()
 {
     var waveIn = new WaveInEvent();
-    var sptt = new SpeechToTextPackage();
     waveIn.DataAvailable += async (sender, e) =>
     {
         // e.Buffer contains the audio data
 
         // Send the audio data to Whisper for transcription
-        var transcription = await sptt.TranslateAsync(e.Buffer);
+        var transcription =  new SpeechToTextPackage();
+            await transcription.TranslateAsync(e.Buffer);
 
         // Handle the transcription (update UI, etc.)
         System.Diagnostics.Debug.WriteLine("Transcription: " + transcription);
@@ -41,7 +41,7 @@ async Task SoxClientTest()
         //.WithExeLocation(System.Environment.GetEnvironmentVariable("sox"))
         //.WithExeLocation("cmd.exe")
         //.WithInputData(byteData)
-        .WithConvertCommand(3, inputFileName, outputFileName)
+        .WithConvertCommand()
         .Build()
         .Execute();
 
@@ -127,9 +127,9 @@ static byte[] CaptureAudio(int duration)
         return commonLength;
     }
 
-    static void ProcessData(byte[] data)
+    static async void ProcessData(byte[] data)
     {
-    var translator = new SpeechToTextPackage().TranslateAsync(data);
-    System.Diagnostics.Debug.WriteLine(translator);
+       var t = new  SpeechToTextPackage();
+           await t.TranslateAsync(data);
         // Implement your logic to transcribe, analyze, or perform any other processing on the audio data
     }

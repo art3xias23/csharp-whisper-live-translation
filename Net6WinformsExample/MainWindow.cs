@@ -36,6 +36,8 @@ namespace Recorder
 
 
         private Timer _timer;
+        private int second = 0;
+        private int processCounter = 0;
 
         public MMDevice SelectedDevice
         {
@@ -81,6 +83,7 @@ namespace Recorder
 
         private void StartCapture()
         {
+            System.Diagnostics.Debug.WriteLine(nameof(StartCapture));
             if (SelectedDevice == null)
                 return;
 
@@ -109,13 +112,21 @@ namespace Recorder
             singleBlockNotificationStream.SingleBlockRead += SingleBlockNotificationStreamOnSingleBlockRead;
 
             _soundIn.Start();
-
+            timer1.Interval = 1000;
+            timer1.Tick += Ticked;
             _timer = new Timer();
             _timer.Interval = IntervalTimeInSeconds * 1000; // Convert to milliseconds
             _timer.Elapsed += ProcessAudio;
             _timer.Start();
 
         }
+
+        private void Ticked(object? sender, EventArgs e)
+        {
+            second++;
+            System.Diagnostics.Debug.WriteLine($"Second: {second}");
+        }
+
         private async void ProcessAudio(object? sender, ElapsedEventArgs e)
         {
             await ProcessData();
@@ -123,12 +134,19 @@ namespace Recorder
 
         private async Task ProcessData()
         {
+            System.Diagnostics.Debug.WriteLine("Stop Capture Begin");
             StopCapture();
+            System.Diagnostics.Debug.WriteLine("Stop Capture End");
             _timer.Stop();
-            var copyOfMemStream = new MemoryStream(_memStream.ToArray());
-            var outputData = ReadExtractedAudio();
-            var dataResponse = await SpeechToTextPackage.TranslateAsync(outputData);
+            //var copyOfMemStream = new MemoryStream(_memStream.ToArray());
+            //var outputData = ReadExtractedAudio();
+                var t= new SpeechToTextPackage();
+
+            System.Diagnostics.Debug.WriteLine($"Begin Translating id: {processCounter}");
+            var dataResponse = await t.TranslateAsync(_memStream.ToArray());
             textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, dataResponse)));
+            System.Diagnostics.Debug.WriteLine($"Begin Translating id: {processCounter}");
+            System.Diagnostics.Debug.WriteLine("Start capture and timer begin");
             _timer.Start();
             StartCapture();
         }

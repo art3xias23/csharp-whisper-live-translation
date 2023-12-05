@@ -29,9 +29,9 @@ namespace Art3xias.SoxWrapper
                 _options.Command = " input.wav output.wav trim -3";
                 return this;
             }
-            public SoxWrapperOptionsBuilder WithConvertCommand()
+            public SoxWrapperOptionsBuilder WithConvertCommand(string inputFileName, string outputFileName)
             {
-                _options.Command = " input.wav -r 16000 output.wav";
+                _options.Command = $"{inputFileName} -r 16000 -e signed-integer {outputFileName}";
                 return this;
             }
 
@@ -55,6 +55,7 @@ namespace Art3xias.SoxWrapper
 
             public void Execute()
             {
+                System.Diagnostics.Debug.WriteLine("ExecuteSox");
                 try
                 {
                     using (var process = new Process())
@@ -71,17 +72,17 @@ namespace Art3xias.SoxWrapper
                             WorkingDirectory = ""
                         };
 
-                            process.Start();
+                        process.Start();
 
-                            string errorOutput = process.StandardError.ReadToEnd();
-                            System.Diagnostics.Debug.WriteLine($"Error output from sox:\n{errorOutput}");
+                        string errorOutput = process.StandardError.ReadToEnd();
+                        System.Diagnostics.Debug.WriteLine($"Error output from sox:\n{errorOutput}");
 
-                            process.WaitForExit();
+                        process.WaitForExit();
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error executing Sox: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error executing Sox: {ex.Message}");
                     throw; // Rethrow the exception after logging
                 }
 
