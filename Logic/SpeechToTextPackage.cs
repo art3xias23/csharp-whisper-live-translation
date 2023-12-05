@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Art3xias.SoxWrapper;
 using Whisper.net;
 using Whisper.net.Ggml;
 using Whisper.net.Logger;
@@ -8,10 +9,25 @@ namespace Logic
 {
     public class SpeechToTextPackage
     {
-        public async Task<string> TranslateAsync(byte[] data)
+        public static async Task<string> TranslateAsync(byte[] data)
         {
             var ggmlType = GgmlType.Base;
             var modelFileName = "ggml-model-whisper-base.en.bin";
+
+            await File.WriteAllBytesAsync("input.wav",data);
+
+            WavDetails.PrintWavDetials(null,"input.wav");
+
+            new SoxWrapperClient()
+                .WithOptions()
+                .WithExeLocation(
+                    @"C:\Users\kmilchev\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\sox-14.4.2\sox.exe")
+                .WithConvertCommand()
+                .Build()
+                .Execute();
+
+            WavDetails.PrintWavDetials(null,"output.wav");
+            var convertedStream = await File.ReadAllBytesAsync("output.wav");
 
             // This section detects whether the "ggml-base.bin" file exists in our project disk. If it doesn't, it downloads it from the internet
             if (!File.Exists(modelFileName))
@@ -30,11 +46,9 @@ namespace Logic
 
             // This section creates the processor object which is used to process the audio file, it uses language `auto` to detect the language of the audio file.
             using var processor = whisperFactory.CreateBuilder()
-                .WithLanguage("auto")
+                .WithLanguage("en")
                 .Build();
-            await File.WriteAllBytesAsync("input.wav",data);
-            WavDetails.PrintWavDetials(null,"input.wav");
-            var memStream = new MemoryStream(data);
+            var memStream = new MemoryStream(convertedStream);
             var text = string.Empty;
             // This section processes the audio file and prints the results (start time, end time and text) to the console.
             await foreach (var result in processor.ProcessAsync(memStream))

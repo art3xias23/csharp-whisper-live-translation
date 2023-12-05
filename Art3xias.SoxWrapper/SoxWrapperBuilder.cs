@@ -29,7 +29,7 @@ namespace Art3xias.SoxWrapper
                 _options.Command = " input.wav output.wav trim -3";
                 return this;
             }
-            public SoxWrapperOptionsBuilder WithConvertCommand(int secondsToExtract, string inputFileName, string outputFileName)
+            public SoxWrapperOptionsBuilder WithConvertCommand()
             {
                 _options.Command = " input.wav -r 16000 output.wav";
                 return this;

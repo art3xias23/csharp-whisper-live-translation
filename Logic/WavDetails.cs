@@ -2,7 +2,7 @@
 
 namespace Logic
 {
-    internal class WavDetails
+    public class WavDetails
     {
         public static void PrintWavDetials(byte[] wavBytes, string inputFile)
         {

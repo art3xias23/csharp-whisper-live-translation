@@ -1,6 +1,5 @@
 ﻿using System;
 using System.ComponentModel;
-using System.Diagnostics.Metrics;
 using Timer = System.Timers.Timer;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -13,7 +12,7 @@ using CSCore.CoreAudioAPI;
 using CSCore.SoundIn;
 using CSCore.Streams;
 using CSCore.Win32;
-using WinformsTranslation;
+using Logic;
 
 namespace Recorder
 {
@@ -31,11 +30,9 @@ namespace Recorder
         private MemoryStream _memStream;
         private readonly GraphVisualization _graphVisualization = new GraphVisualization();
         private IWaveSource _finalSource;
-        private bool _manualStop = false;
 
         private string _inputFileName = "input.wav";
         private string _outputFileName = "output.wav";
-        private int conter = 0;
 
 
         private Timer _timer;
@@ -47,7 +44,7 @@ namespace Recorder
             {
                 _selectedDevice = value;
                 //if (value != null)
-                //btnStart.Enabled = true;
+                    //btnStart.Enabled = true;
             }
         }
 
@@ -84,8 +81,14 @@ namespace Recorder
 
         private void StartCapture()
         {
-            if (HandleSoundIn()) return;
-            _soundIn = new WasapiCapture();
+            if (SelectedDevice == null)
+                return;
+
+            if (CaptureMode == CaptureMode.Capture)
+                _soundIn = new WasapiCapture();
+            else
+                _soundIn = new WasapiLoopbackCapture();
+
             _soundIn.Device = SelectedDevice;
             _soundIn.Initialize();
             _memStream = new MemoryStream();
@@ -100,15 +103,7 @@ namespace Recorder
             {
                 int read;
                 while ((read = _finalSource.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    if (_manualStop)
-                    {
-                        _memStream = new MemoryStream();
-                        _writer = new WaveWriter(_memStream, _finalSource.WaveFormat);
-                        _manualStop = false;
-                    }
                     _writer.Write(buffer, 0, read);
-                }
             };
 
             singleBlockNotificationStream.SingleBlockRead += SingleBlockNotificationStreamOnSingleBlockRead;
@@ -121,76 +116,21 @@ namespace Recorder
             _timer.Start();
 
         }
-        private async Task StartNotificationCapture()
-        {
-            if (HandleSoundIn()) return;
-            _soundIn = new WasapiCapture();
-            _soundIn.Device = SelectedDevice;
-            _soundIn.Initialize();
-
-            var soundInSource = new SoundInSource(_soundIn);
-
-            var notificationSource = new NotificationSource(soundInSource.ToSampleSource());
-            notificationSource.Interval = 5000; //5 seconds
-            notificationSource.BlockRead += async(s, e) =>
-            {
-                var fileName = "input.wav";
-
-                using(var writer = new WaveWriter(fileName, notificationSource.WaveFormat))
-                    writer.WriteSamples(e.Data, 0, e.Length);
-
-
-                var result = await SpeechToTextPackage.TranslateAsync(fileName);
-                textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, result)));
-            };
-
-            var waveSource = notificationSource.ToWaveSource();
-
-            var writer = new WaveWriter("out.wav", waveSource.WaveFormat);
-
-            byte[] buffer = new byte[waveSource.WaveFormat.BytesPerSecond / 2];
-
-            soundInSource.DataAvailable += (s, e) =>
-            {
-                int read;
-                while((read = waveSource.Read(buffer, 0, buffer.Length)) > 0)
-                    writer.Write(buffer, 0, read);
-            };
-
-            var singleBlockNotificationStream = new SingleBlockNotificationStream(soundInSource.ToSampleSource());
-
-            singleBlockNotificationStream.SingleBlockRead += SingleBlockNotificationStreamOnSingleBlockRead;
-
-            _soundIn.Start();
-
-        }
-
-        private bool HandleSoundIn()
-        {
-            if (SelectedDevice == null)
-                return true;
-            return false;
-        }
-
         private async void ProcessAudio(object? sender, ElapsedEventArgs e)
         {
-            //Every 5 seconds
-            _manualStop = true;
             await ProcessData();
-            _timer.Stop();
-            _timer.Start();
         }
 
         private async Task ProcessData()
         {
+            StopCapture();
+            _timer.Stop();
             var copyOfMemStream = new MemoryStream(_memStream.ToArray());
-            _inputFileName = conter + _inputFileName;
-            File.WriteAllBytes(_inputFileName, copyOfMemStream.ToArray());
-            WavDetails.PrintWavDetials(null, _inputFileName);
-            //ExtractAudio();
-            //var outputData = ReadExtractedAudio();
-            //var dataResponse = await SpeechToTextApi.SpToTextAsync(outputData);
-            //textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, dataResponse)));
+            var outputData = ReadExtractedAudio();
+            var dataResponse = await SpeechToTextPackage.TranslateAsync(outputData);
+            textBox1.Invoke(new Action(() => textBox1.Text = string.Concat(textBox1.Text, dataResponse)));
+            _timer.Start();
+            StartCapture();
         }
 
         private byte[] ReadExtractedAudio()
@@ -221,11 +161,10 @@ namespace Recorder
             return (WaveFormat)Marshal.PtrToStructure(blob.Data, typeof(WaveFormat));
         }
 
-        private async void btnStart_Click(object sender, EventArgs e)
+        private void btnStart_Click(object sender, EventArgs e)
         {
             CreateInputFileName();
-            //StartCapture();
-            await StartNotificationCapture();
+            StartCapture();
             btnStart.Enabled = false;
             btnStop.Enabled = true;
         }
@@ -238,8 +177,6 @@ namespace Recorder
         private void btnStop_Click(object sender, EventArgs e)
         {
             StopCapture();
-            btnStart.Enabled = true;
-            btnStop.Enabled = false;
         }
 
         private async void StopCapture()
@@ -249,7 +186,7 @@ namespace Recorder
                 _soundIn.Stop();
                 _soundIn.Dispose();
                 _soundIn = null;
-                _finalSource?.Dispose();
+                _finalSource.Dispose();
 
                 if (_writer is IDisposable)
                     ((IDisposable)_writer).Dispose();
